@@ -11,6 +11,7 @@
   - 新版环境的依赖清单
   - 保存预测结果和对比图的脚本
   - 我们自己跑出来的评测日志和逐样本分数
+  - 22 张代表性的预测对比图
 
 ## 复现结果
 
@@ -51,7 +52,10 @@
 └── results/
     ├── benchmark_logs/          官方 benchmark 脚本的原始输出
     ├── ucf101_metrics.csv       UCF101 每组样本的 PSNR，从低到高排序
-    └── middlebury_metrics.csv   Middlebury 每个场景的 IE，从高到低排序
+    ├── middlebury_metrics.csv   Middlebury 每个场景的 IE，从高到低排序
+    └── compare/                 预测对比图（JPG）
+        ├── middlebury/          全部 12 个场景
+        └── ucf101/              PSNR 最低的 5 组（worst1–5）和最高的 5 组（best1–5）
 ```
 
 ---
@@ -233,12 +237,53 @@ python CS_543_Vedio_Interpolation/tools/save_predictions.py --rife ECCV2022-RIFE
 
 ## 观察
 
-- **Middlebury 场景之间的误差相差近 4 倍。**
-  - 最差：DogDance，IE 3.129。误差集中在狗的长毛边缘和小孩抬起的脚，都是快速的非刚体运动。
-  - 最好：Urban2，IE 0.841。这是纹理简单、运动平稳的合成场景。
-- **UCF101 各样本的 PSNR 从 17 到 56 dB 都有。**
-  - 最差：#3081，PSNR 17.09。摩托艇和镜头同时在晃，海平线整体倾斜，预测和真值没对齐。
-  - 平均值 35.29 里，既有大量几乎不动的简单样本，也有少数很难的样本。
+下面的对比图都是 `tools/save_predictions.py` 生成的。
+
+**图的布局：**
+- 第一行：输入帧 0 | 真值 | RIFE 预测 | 输入帧 1
+- 第二行：分数 | 真值 | RIFE 预测 | 误差热力图（|预测 − 真值| × 10，蓝色表示误差小，红色表示误差大）
+
+### Middlebury：场景之间的误差相差近 4 倍
+
+**最差：DogDance（IE 3.129）。** 背景几乎全是蓝色，误差集中在狗的长毛边缘和小孩抬起的脚上。这些都是快速的非刚体运动，正是插帧最难的地方。
+
+![Middlebury DogDance](results/compare/middlebury/DogDance.jpg)
+
+**最好：Urban2（IE 0.841）。** 这是纹理简单、运动平稳的合成城市场景，误差图几乎全是蓝色。
+
+![Middlebury Urban2](results/compare/middlebury/Urban2.jpg)
+
+其余场景按 IE 从高到低排列：
+[Venus](results/compare/middlebury/Venus.jpg) 2.904 ·
+[Grove3](results/compare/middlebury/Grove3.jpg) 2.798 ·
+[Beanbags](results/compare/middlebury/Beanbags.jpg) 2.573 ·
+[MiniCooper](results/compare/middlebury/MiniCooper.jpg) 2.065 ·
+[Walking](results/compare/middlebury/Walking.jpg) 1.910 ·
+[Hydrangea](results/compare/middlebury/Hydrangea.jpg) 1.802 ·
+[Grove2](results/compare/middlebury/Grove2.jpg) 1.771 ·
+[Dimetrodon](results/compare/middlebury/Dimetrodon.jpg) 1.596 ·
+[RubberWhale](results/compare/middlebury/RubberWhale.jpg) 1.131 ·
+[Urban3](results/compare/middlebury/Urban3.jpg) 0.954
+
+### UCF101：各样本的 PSNR 从 17 到 56 dB 都有
+
+**最差：#3081（PSNR 17.09）。** 摩托艇和镜头同时在晃，海平线整体发生了倾斜和位移。预测的海平线和真值没对齐，误差图上是一条红色斜线，波浪区域也到处是误差。
+
+![UCF101 #3081](results/compare/ucf101/worst1_3081.jpg)
+
+**最好：#721（PSNR 56.42）。** 游泳的画面，前后两帧几乎没有运动，预测和真值基本一模一样。画面上下还有黑边，黑边部分很容易预测准确，也把 PSNR 拉高了。
+
+![UCF101 #721](results/compare/ucf101/best1_721.jpg)
+
+| 排名 | PSNR 最低的 5 组 | PSNR 最高的 5 组 |
+| --- | --- | --- |
+| 1 | [#3081](results/compare/ucf101/worst1_3081.jpg) 17.09 | [#721](results/compare/ucf101/best1_721.jpg) 56.42 |
+| 2 | [#191](results/compare/ucf101/worst2_191.jpg) 17.67 | [#1321](results/compare/ucf101/best2_1321.jpg) 55.62 |
+| 3 | [#3661](results/compare/ucf101/worst3_3661.jpg) 18.13 | [#3701](results/compare/ucf101/best3_3701.jpg) 54.10 |
+| 4 | [#1961](results/compare/ucf101/worst4_1961.jpg) 18.66 | [#1091](results/compare/ucf101/best4_1091.jpg) 53.63 |
+| 5 | [#211](results/compare/ucf101/worst5_211.jpg) 19.17 | [#441](results/compare/ucf101/best5_441.jpg) 51.96 |
+
+平均值 35.29 里，既有大量几乎不动的简单样本，也有少数很难的样本。所以只看平均分，看不出模型在难样本上的表现。
 
 ## 常见问题
 
@@ -258,7 +303,8 @@ python CS_543_Vedio_Interpolation/tools/save_predictions.py --rife ECCV2022-RIFE
   - UCF101 评测集：[DVF](https://liuziwei7.github.io/projects/VoxelFlow)
   - [Middlebury](https://vision.middlebury.edu/flow/)
   - [Vimeo90K](http://toflow.csail.mit.edu/)
-  - 版权归各自作者所有，本仓库不重新分发。
+  - 版权归各自作者所有，本仓库不重新分发数据集。
+  - `results/compare/` 里的对比图包含少量测试帧，仅用于展示复现结果。
 
 ```bibtex
 @inproceedings{huang2022rife,
