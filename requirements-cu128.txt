@@ -1,0 +1,7 @@
+# 新版环境的依赖（已在 Python 3.12 + PyTorch 2.11.0+cu128 上测试）
+# torch / torchvision 要单独安装，指定 CUDA 版本：
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+numpy
+opencv-python
+tqdm
+gdown
