@@ -1,0 +1,6 @@
+{
+  "name": "CS543 Video Interpolation",
+  "dockerComposeFile": "../compose.yaml",
+  "service": "dev",
+  "workspaceFolder": "/workspace"
+}
