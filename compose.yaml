@@ -1,0 +1,14 @@
+services:
+  dev:
+    image: cs543-vfi:cu128
+    command: ["sleep", "infinity"]
+    volumes:
+      - .:/workspace
+      - ../ECCV2022-RIFE:/rife
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
