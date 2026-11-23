@@ -5,6 +5,7 @@ WORKDIR /work
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
+        ffmpeg \
         git \
         libgl1 \
         libglib2.0-0 \

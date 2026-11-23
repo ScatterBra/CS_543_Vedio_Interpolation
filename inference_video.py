@@ -8,15 +8,27 @@ from torch.nn import functional as F
 import warnings
 import _thread
 import threading
-import skvideo.io
 from queue import Queue, Empty
 from benchmark.pytorch_msssim import ssim_matlab
 
 warnings.filterwarnings("ignore")
 
+def read_video(path):
+    capture = cv2.VideoCapture(path)
+    try:
+        if not capture.isOpened():
+            raise RuntimeError('Cannot open video: {}'.format(path))
+        while True:
+            success, frame = capture.read()
+            if not success:
+                break
+            yield cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    finally:
+        capture.release()
+
+
 def transferAudio(sourceVideo, targetVideo):
     import tempfile
-    import moviepy.editor
 
     output_dir = os.path.dirname(os.path.abspath(targetVideo))
     with tempfile.TemporaryDirectory(prefix='audio_', dir=output_dir) as temp_dir:
@@ -94,7 +106,7 @@ if not args.video is None:
         args.fps = fps * (2 ** args.exp)
     else:
         fpsNotAssigned = False
-    videogen = skvideo.io.vreader(args.video)
+    videogen = read_video(args.video)
     lastframe = next(videogen)
     fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
     video_path_wo_ext, ext = os.path.splitext(args.video)
