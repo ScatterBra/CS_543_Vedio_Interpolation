@@ -15,35 +15,18 @@ if torch.cuda.is_available():
 parser = argparse.ArgumentParser(description='Interpolation for a pair of images')
 parser.add_argument('--img', dest='img', nargs=2, required=True)
 parser.add_argument('--exp', default=4, type=int)
+parser.add_argument('--output', default=os.path.join('output', 'images'), help='Output image directory')
 parser.add_argument('--ratio', default=0, type=float, help='inference ratio between two images with 0 - 1 range')
 parser.add_argument('--rthreshold', default=0.02, type=float, help='returns image when actual ratio falls in given range threshold')
 parser.add_argument('--rmaxcycles', default=8, type=int, help='limit max number of bisectional cycles')
-parser.add_argument('--model', dest='modelDir', type=str, default='train_log', help='directory with trained model files')
+parser.add_argument('--model', required=True, help='Path to the model weights file')
 
 args = parser.parse_args()
 
-try:
-    try:
-        try:
-            from model.RIFE_HDv2 import Model
-            model = Model()
-            model.load_model(args.modelDir, -1)
-            print("Loaded v2.x HD model.")
-        except:
-            from train_log.RIFE_HDv3 import Model
-            model = Model()
-            model.load_model(args.modelDir, -1)
-            print("Loaded v3.x HD model.")
-    except:
-        from model.RIFE_HD import Model
-        model = Model()
-        model.load_model(args.modelDir, -1)
-        print("Loaded v1.x HD model")
-except:
-    from model.RIFE import Model
-    model = Model()
-    model.load_model(args.modelDir, -1)
-    print("Loaded ArXiv-RIFE model")
+from rife.model.RIFE import Model
+model = Model()
+model.load_model(args.model)
+print("Loaded RIFE paper model")
 model.eval()
 model.device()
 
@@ -102,10 +85,9 @@ else:
         tmp.append(img1)
         img_list = tmp
 
-if not os.path.exists('output'):
-    os.mkdir('output')
+os.makedirs(args.output, exist_ok=True)
 for i in range(len(img_list)):
     if args.img[0].endswith('.exr') and args.img[1].endswith('.exr'):
-        cv2.imwrite('output/img{}.exr'.format(i), (img_list[i][0]).cpu().numpy().transpose(1, 2, 0)[:h, :w], [cv2.IMWRITE_EXR_TYPE, cv2.IMWRITE_EXR_TYPE_HALF])
+        cv2.imwrite(os.path.join(args.output, 'img{}.exr'.format(i)), (img_list[i][0]).cpu().numpy().transpose(1, 2, 0)[:h, :w], [cv2.IMWRITE_EXR_TYPE, cv2.IMWRITE_EXR_TYPE_HALF])
     else:
-        cv2.imwrite('output/img{}.png'.format(i), (img_list[i][0] * 255).byte().cpu().numpy().transpose(1, 2, 0)[:h, :w])
+        cv2.imwrite(os.path.join(args.output, 'img{}.png'.format(i)), (img_list[i][0] * 255).byte().cpu().numpy().transpose(1, 2, 0)[:h, :w])

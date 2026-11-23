@@ -8,15 +8,13 @@ import numpy as np
 import random
 import argparse
 
-from model.RIFE import Model
+from rife.model.RIFE import Model
 from dataset import *
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data.distributed import DistributedSampler
 
 device = torch.device("cuda")
-
-log_path = 'train_log'
 
 def get_learning_rate(step):
     if step < 2000:
@@ -38,18 +36,20 @@ def flow2rgb(flow_map_np):
 
 def train(model, local_rank):
     if local_rank == 0:
-        writer = SummaryWriter('train')
-        writer_val = SummaryWriter('validate')
+        output_dir = os.path.dirname(os.path.abspath(args.output))
+        os.makedirs(output_dir, exist_ok=True)
+        writer = SummaryWriter(os.path.join(output_dir, 'logs', 'train'))
+        writer_val = SummaryWriter(os.path.join(output_dir, 'logs', 'validate'))
     else:
         writer = None
         writer_val = None
     step = 0
     nr_eval = 0
-    dataset = VimeoDataset('train')
+    dataset = VimeoDataset('train', args.data)
     sampler = DistributedSampler(dataset)
     train_data = DataLoader(dataset, batch_size=args.batch_size, num_workers=8, pin_memory=True, drop_last=True, sampler=sampler)
     args.step_per_epoch = train_data.__len__()
-    dataset_val = VimeoDataset('validation')
+    dataset_val = VimeoDataset('validation', args.data)
     val_data = DataLoader(dataset_val, batch_size=16, pin_memory=True, num_workers=8)
     print('training...')
     time_stamp = time.time()
@@ -79,7 +79,7 @@ def train(model, local_rank):
                 merged_img = (info['merged_tea'].permute(0, 2, 3, 1).detach().cpu().numpy() * 255).astype('uint8')
                 flow0 = info['flow'].permute(0, 2, 3, 1).detach().cpu().numpy()
                 flow1 = info['flow_tea'].permute(0, 2, 3, 1).detach().cpu().numpy()
-                for i in range(5):
+                for i in range(min(5, len(gt))):
                     imgs = np.concatenate((merged_img[i], pred[i], gt[i]), 1)[:, :, ::-1]
                     writer.add_image(str(i) + '/img', imgs, step, dataformats='HWC')
                     writer.add_image(str(i) + '/flow', np.concatenate((flow2rgb(flow0[i]), flow2rgb(flow1[i])), 1), step, dataformats='HWC')
@@ -91,7 +91,7 @@ def train(model, local_rank):
         nr_eval += 1
         if nr_eval % 5 == 0:
             evaluate(model, val_data, step, local_rank, writer_val)
-        model.save_model(log_path, local_rank)    
+        model.save_model(args.output, local_rank)
         dist.barrier()
 
 def evaluate(model, val_data, nr_eval, local_rank, writer_val):
@@ -123,7 +123,7 @@ def evaluate(model, val_data, nr_eval, local_rank, writer_val):
         flow0 = info['flow'].permute(0, 2, 3, 1).cpu().numpy()
         flow1 = info['flow_tea'].permute(0, 2, 3, 1).cpu().numpy()
         if i == 0 and local_rank == 0:
-            for j in range(10):
+            for j in range(min(10, len(gt))):
                 imgs = np.concatenate((merged_img[j], pred[j], gt[j]), 1)[:, :, ::-1]
                 writer_val.add_image(str(j) + '/img', imgs.copy(), nr_eval, dataformats='HWC')
                 writer_val.add_image(str(j) + '/flow', flow2rgb(flow0[j][:, :, ::-1]), nr_eval, dataformats='HWC')
@@ -137,9 +137,12 @@ def evaluate(model, val_data, nr_eval, local_rank, writer_val):
         
 if __name__ == "__main__":    
     parser = argparse.ArgumentParser()
+    parser.add_argument('--data', required=True, help='Path to the training dataset directory (currently Vimeo triplet format)')
+    parser.add_argument('--pretrained', default=None, help='Path to the pretrained model weights file')
+    parser.add_argument('--output', default=os.path.join('outputs', 'train', 'model.pkl'), help='Path to the output model weights file')
     parser.add_argument('--epoch', default=300, type=int)
     parser.add_argument('--batch_size', default=16, type=int, help='minibatch size')
-    parser.add_argument('--local_rank', default=0, type=int, help='local rank')
+    parser.add_argument('--local_rank', '--local-rank', default=0, type=int, help='local rank')
     parser.add_argument('--world_size', default=4, type=int, help='world size')
     args = parser.parse_args()
     torch.distributed.init_process_group(backend="nccl", world_size=args.world_size)
@@ -151,5 +154,7 @@ if __name__ == "__main__":
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.benchmark = True
     model = Model(args.local_rank)
+    if args.pretrained:
+        model.load_model(args.pretrained)
     train(model, args.local_rank)
         

@@ -4,23 +4,19 @@ import numpy as np
 from torch.optim import AdamW
 import torch.optim as optim
 import itertools
-from model.warplayer import warp
+from .warplayer import warp
 from torch.nn.parallel import DistributedDataParallel as DDP
-from model.IFNet import *
-from model.IFNet_m import *
+from .IFNet import *
 import torch.nn.functional as F
-from model.loss import *
-from model.laplacian import *
-from model.refine import *
+from .loss import *
+from .laplacian import *
+from .refine import *
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
 class Model:
-    def __init__(self, local_rank=-1, arbitrary=False):
-        if arbitrary == True:
-            self.flownet = IFNet_m()
-        else:
-            self.flownet = IFNet()
+    def __init__(self, local_rank=-1):
+        self.flownet = IFNet()
         self.device()
         self.optimG = AdamW(self.flownet.parameters(), lr=1e-6, weight_decay=1e-3) # use large weight decay may avoid NaN loss
         self.epe = EPE()
@@ -43,15 +39,14 @@ class Model:
             return {
             k.replace("module.", ""): v
                 for k, v in param.items()
-                if "module." in k
             }
-            
-        if rank <= 0:
-            self.flownet.load_state_dict(convert(torch.load('{}/flownet.pkl'.format(path))))
+
+        flownet = self.flownet.module if isinstance(self.flownet, DDP) else self.flownet
+        flownet.load_state_dict(convert(torch.load(path, map_location='cpu')))
         
     def save_model(self, path, rank=0):
         if rank == 0:
-            torch.save(self.flownet.state_dict(),'{}/flownet.pkl'.format(path))
+            torch.save(self.flownet.state_dict(), path)
 
     def inference(self, img0, img1, scale=1, scale_list=None, TTA=False, timestep=0.5):
         if scale_list is None:

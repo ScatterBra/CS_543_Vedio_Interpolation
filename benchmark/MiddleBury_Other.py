@@ -7,21 +7,29 @@ import torch
 import argparse
 import numpy as np
 from torch.nn import functional as F
-from model.pytorch_msssim import ssim_matlab
-from model.RIFE import Model
+from benchmark.pytorch_msssim import ssim_matlab
+from rife.model.RIFE import Model
+
+parser = argparse.ArgumentParser(description='Evaluate RIFE on Middlebury')
+parser.add_argument('--model', required=True, help='Path to the model weights file')
+parser.add_argument('--data', required=True, help='Path to the directory containing other-data and other-gt-interp')
+args = parser.parse_args()
+
+torch.set_grad_enabled(False)
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 model = Model()
-model.load_model('train_log')
+model.load_model(args.model)
 model.eval()
 model.device()
 
 name = ['Beanbags', 'Dimetrodon', 'DogDance', 'Grove2', 'Grove3', 'Hydrangea', 'MiniCooper', 'RubberWhale', 'Urban2', 'Urban3', 'Venus', 'Walking']
 IE_list = []
 for i in name:
-    i0 = cv2.imread('other-data/{}/frame10.png'.format(i)).transpose(2, 0, 1) / 255.
-    i1 = cv2.imread('other-data/{}/frame11.png'.format(i)).transpose(2, 0, 1) / 255.
-    gt = cv2.imread('other-gt-interp/{}/frame10i11.png'.format(i)) 
+    i0 = cv2.imread(os.path.join(args.data, 'other-data', i, 'frame10.png')).transpose(2, 0, 1) / 255.
+    i1 = cv2.imread(os.path.join(args.data, 'other-data', i, 'frame11.png')).transpose(2, 0, 1) / 255.
+    gt = cv2.imread(os.path.join(args.data, 'other-gt-interp', i, 'frame10i11.png'))
     h, w = i0.shape[1], i0.shape[2]
     imgs = torch.zeros([1, 6, 480, 640]).to(device)
     ph = (480 - h) // 2

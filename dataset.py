@@ -9,12 +9,12 @@ from torch.utils.data import DataLoader, Dataset
 cv2.setNumThreads(1)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 class VimeoDataset(Dataset):
-    def __init__(self, dataset_name, batch_size=32):
+    def __init__(self, dataset_name, data_root, batch_size=32):
         self.batch_size = batch_size
         self.dataset_name = dataset_name        
         self.h = 256
         self.w = 448
-        self.data_root = 'vimeo_triplet'
+        self.data_root = data_root
         self.image_root = os.path.join(self.data_root, 'sequences')
         train_fn = os.path.join(self.data_root, 'tri_trainlist.txt')
         test_fn = os.path.join(self.data_root, 'tri_testlist.txt')

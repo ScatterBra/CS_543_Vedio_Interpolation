@@ -7,58 +7,50 @@ from tqdm import tqdm
 from torch.nn import functional as F
 import warnings
 import _thread
+import threading
 import skvideo.io
 from queue import Queue, Empty
-from model.pytorch_msssim import ssim_matlab
+from benchmark.pytorch_msssim import ssim_matlab
 
 warnings.filterwarnings("ignore")
 
 def transferAudio(sourceVideo, targetVideo):
-    import shutil
+    import tempfile
     import moviepy.editor
-    tempAudioFileName = "./temp/audio.mkv"
 
-    # split audio from original video file and store in "temp" directory
-    if True:
-
-        # clear old "temp" directory if it exits
-        if os.path.isdir("temp"):
-            # remove temp directory
-            shutil.rmtree("temp")
-        # create new "temp" directory
-        os.makedirs("temp")
+    output_dir = os.path.dirname(os.path.abspath(targetVideo))
+    with tempfile.TemporaryDirectory(prefix='audio_', dir=output_dir) as temp_dir:
+        tempAudioFileName = os.path.join(temp_dir, 'audio.mkv')
         # extract audio from video
-        os.system('ffmpeg -y -i "{}" -c:a copy -vn {}'.format(sourceVideo, tempAudioFileName))
+        os.system('ffmpeg -y -i "{}" -c:a copy -vn "{}"'.format(sourceVideo, tempAudioFileName))
 
-    targetNoAudio = os.path.splitext(targetVideo)[0] + "_noaudio" + os.path.splitext(targetVideo)[1]
-    os.rename(targetVideo, targetNoAudio)
-    # combine audio file and new video file
-    os.system('ffmpeg -y -i "{}" -i {} -c copy "{}"'.format(targetNoAudio, tempAudioFileName, targetVideo))
+        targetNoAudio = os.path.splitext(targetVideo)[0] + "_noaudio" + os.path.splitext(targetVideo)[1]
+        os.rename(targetVideo, targetNoAudio)
+        # combine audio file and new video file
+        os.system('ffmpeg -y -i "{}" -i "{}" -c copy "{}"'.format(targetNoAudio, tempAudioFileName, targetVideo))
 
-    if os.path.getsize(targetVideo) == 0: # if ffmpeg failed to merge the video and audio together try converting the audio to aac
-        tempAudioFileName = "./temp/audio.m4a"
-        os.system('ffmpeg -y -i "{}" -c:a aac -b:a 160k -vn {}'.format(sourceVideo, tempAudioFileName))
-        os.system('ffmpeg -y -i "{}" -i {} -c copy "{}"'.format(targetNoAudio, tempAudioFileName, targetVideo))
-        if (os.path.getsize(targetVideo) == 0): # if aac is not supported by selected format
-            os.rename(targetNoAudio, targetVideo)
-            print("Audio transfer failed. Interpolated video will have no audio")
+        if os.path.getsize(targetVideo) == 0: # if ffmpeg failed to merge the video and audio together try converting the audio to aac
+            tempAudioFileName = os.path.join(temp_dir, 'audio.m4a')
+            os.system('ffmpeg -y -i "{}" -c:a aac -b:a 160k -vn "{}"'.format(sourceVideo, tempAudioFileName))
+            os.system('ffmpeg -y -i "{}" -i "{}" -c copy "{}"'.format(targetNoAudio, tempAudioFileName, targetVideo))
+            if (os.path.getsize(targetVideo) == 0): # if aac is not supported by selected format
+                os.rename(targetNoAudio, targetVideo)
+                print("Audio transfer failed. Interpolated video will have no audio")
+            else:
+                print("Lossless audio transfer failed. Audio was transcoded to AAC (M4A) instead.")
+
+                # remove audio-less video
+                os.remove(targetNoAudio)
         else:
-            print("Lossless audio transfer failed. Audio was transcoded to AAC (M4A) instead.")
-
-            # remove audio-less video
             os.remove(targetNoAudio)
-    else:
-        os.remove(targetNoAudio)
 
-    # remove temp directory
-    shutil.rmtree("temp")
 
 parser = argparse.ArgumentParser(description='Interpolation for a pair of images')
 parser.add_argument('--video', dest='video', type=str, default=None)
-parser.add_argument('--output', dest='output', type=str, default=None)
+parser.add_argument('--output', dest='output', type=str, default=None, help='Output video file, or output directory in PNG mode')
 parser.add_argument('--img', dest='img', type=str, default=None)
 parser.add_argument('--montage', dest='montage', action='store_true', help='montage origin video')
-parser.add_argument('--model', dest='modelDir', type=str, default='train_log', help='directory with trained model files')
+parser.add_argument('--model', required=True, help='Path to the model weights file')
 parser.add_argument('--fp16', dest='fp16', action='store_true', help='fp16 mode for faster and more lightweight inference on cards with Tensor Cores')
 parser.add_argument('--UHD', dest='UHD', action='store_true', help='support 4k video')
 parser.add_argument('--scale', dest='scale', type=float, default=1.0, help='Try scale=0.5 for 4k video')
@@ -85,28 +77,10 @@ if torch.cuda.is_available():
     if(args.fp16):
         torch.set_default_tensor_type(torch.cuda.HalfTensor)
 
-try:
-    try:
-        try:
-            from model.RIFE_HDv2 import Model
-            model = Model()
-            model.load_model(args.modelDir, -1)
-            print("Loaded v2.x HD model.")
-        except:
-            from train_log.RIFE_HDv3 import Model
-            model = Model()
-            model.load_model(args.modelDir, -1)
-            print("Loaded v3.x HD model.")
-    except:
-        from model.RIFE_HD import Model
-        model = Model()
-        model.load_model(args.modelDir, -1)
-        print("Loaded v1.x HD model")
-except:
-    from model.RIFE import Model
-    model = Model()
-    model.load_model(args.modelDir, -1)
-    print("Loaded ArXiv-RIFE model")
+from rife.model.RIFE import Model
+model = Model()
+model.load_model(args.model)
+print("Loaded RIFE paper model")
 model.eval()
 model.device()
 
@@ -142,13 +116,15 @@ h, w, _ = lastframe.shape
 vid_out_name = None
 vid_out = None
 if args.png:
-    if not os.path.exists('vid_out'):
-        os.mkdir('vid_out')
+    if args.output is None:
+        args.output = os.path.join('output', 'frames')
+    os.makedirs(args.output, exist_ok=True)
 else:
     if args.output is not None:
         vid_out_name = args.output
     else:
-        vid_out_name = '{}_{}X_{}fps.{}'.format(video_path_wo_ext, (2 ** args.exp), int(np.round(args.fps)), args.ext)
+        vid_out_name = os.path.join('output', 'videos', '{}_{}X_{}fps.{}'.format(os.path.basename(video_path_wo_ext), (2 ** args.exp), int(np.round(args.fps)), args.ext))
+    os.makedirs(os.path.dirname(os.path.abspath(vid_out_name)), exist_ok=True)
     vid_out = cv2.VideoWriter(vid_out_name, fourcc, args.fps, (w, h))
 
 def clear_write_buffer(user_args, write_buffer):
@@ -158,7 +134,7 @@ def clear_write_buffer(user_args, write_buffer):
         if item is None:
             break
         if user_args.png:
-            cv2.imwrite('vid_out/{:0>7d}.png'.format(cnt), item[:, :, ::-1])
+            cv2.imwrite(os.path.join(user_args.output, '{:0>7d}.png'.format(cnt)), item[:, :, ::-1])
             cnt += 1
         else:
             vid_out.write(item[:, :, ::-1])
@@ -206,7 +182,8 @@ if args.montage:
 write_buffer = Queue(maxsize=500)
 read_buffer = Queue(maxsize=500)
 _thread.start_new_thread(build_read_buffer, (args, read_buffer, videogen))
-_thread.start_new_thread(clear_write_buffer, (args, write_buffer))
+write_thread = threading.Thread(target=clear_write_buffer, args=(args, write_buffer))
+write_thread.start()
 
 I1 = torch.from_numpy(np.transpose(lastframe, (2,0,1))).to(device, non_blocking=True).unsqueeze(0).float() / 255.
 I1 = pad_image(I1)
@@ -280,9 +257,7 @@ else:
 
 write_buffer.put(None)
 
-import time
-while(not write_buffer.empty()):
-    time.sleep(0.1)
+write_thread.join()
 pbar.close()
 if not vid_out is None:
     vid_out.release()

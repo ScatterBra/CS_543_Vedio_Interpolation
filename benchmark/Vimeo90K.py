@@ -7,27 +7,35 @@ import torch
 import argparse
 import numpy as np
 from torch.nn import functional as F
-from model.pytorch_msssim import ssim_matlab
-from model.RIFE import Model
+from benchmark.pytorch_msssim import ssim_matlab
+from rife.model.RIFE import Model
+
+parser = argparse.ArgumentParser(description='Evaluate RIFE on Vimeo90K')
+parser.add_argument('--model', required=True, help='Path to the model weights file')
+parser.add_argument('--data', required=True, help='Path to the vimeo_interp_test directory')
+args = parser.parse_args()
+
+torch.set_grad_enabled(False)
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 model = Model()
-model.load_model('train_log')
+model.load_model(args.model)
 model.eval()
 model.device()
 
-path = 'vimeo_interp_test/'
-f = open(path + 'tri_testlist.txt', 'r')
+path = args.data
+f = open(os.path.join(path, 'tri_testlist.txt'), 'r')
 psnr_list = []
 ssim_list = []
 for i in f:
     name = str(i).strip()
     if(len(name) <= 1):
         continue
-    print(path + 'target/' + name + '/im1.png')
-    I0 = cv2.imread(path + 'target/' + name + '/im1.png')
-    I1 = cv2.imread(path + 'target/' + name + '/im2.png')
-    I2 = cv2.imread(path + 'target/' + name + '/im3.png')
+    print(os.path.join(path, 'target', name, 'im1.png'))
+    I0 = cv2.imread(os.path.join(path, 'target', name, 'im1.png'))
+    I1 = cv2.imread(os.path.join(path, 'target', name, 'im2.png'))
+    I2 = cv2.imread(os.path.join(path, 'target', name, 'im3.png'))
     I0 = (torch.tensor(I0.transpose(2, 0, 1)).to(device) / 255.).unsqueeze(0)
     I2 = (torch.tensor(I2.transpose(2, 0, 1)).to(device) / 255.).unsqueeze(0)
     mid = model.inference(I0, I2)[0]

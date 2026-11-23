@@ -7,24 +7,32 @@ import torch
 import argparse
 import numpy as np
 from torch.nn import functional as F
-from model.pytorch_msssim import ssim_matlab
-from model.RIFE import Model
+from benchmark.pytorch_msssim import ssim_matlab
+from rife.model.RIFE import Model
+
+parser = argparse.ArgumentParser(description='Evaluate RIFE on UCF101')
+parser.add_argument('--model', required=True, help='Path to the model weights file')
+parser.add_argument('--data', required=True, help='Path to the ucf101_interp_ours directory')
+args = parser.parse_args()
+
+torch.set_grad_enabled(False)
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 model = Model()
-model.load_model('train_log')
+model.load_model(args.model)
 model.eval()
 model.device()
 
-path = 'UCF101/ucf101_interp_ours/'
+path = args.data
 dirs = os.listdir(path)
 psnr_list = []
 ssim_list = []
 print(len(dirs))
 for d in dirs:
-    img0 = (path + d + '/frame_00.png')
-    img1 = (path + d + '/frame_02.png')
-    gt = (path + d + '/frame_01_gt.png')
+    img0 = os.path.join(path, d, 'frame_00.png')
+    img1 = os.path.join(path, d, 'frame_02.png')
+    gt = os.path.join(path, d, 'frame_01_gt.png')
     img0 = (torch.tensor(cv2.imread(img0).transpose(2, 0, 1) / 255.)).to(device).float().unsqueeze(0)
     img1 = (torch.tensor(cv2.imread(img1).transpose(2, 0, 1) / 255.)).to(device).float().unsqueeze(0)
     gt = (torch.tensor(cv2.imread(gt).transpose(2, 0, 1) / 255.)).to(device).float().unsqueeze(0)
