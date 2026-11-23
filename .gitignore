@@ -1,5 +1,8 @@
+output/
 outputs/
 __pycache__/
 *.pyc
 .venv/
 *.zip
+
+*.pkl
