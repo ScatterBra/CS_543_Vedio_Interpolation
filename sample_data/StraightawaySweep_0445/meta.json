@@ -1,0 +1,28 @@
+{
+ "shot": "StraightawaySweep",
+ "frames": {
+  "I0": 444,
+  "I1_gt": 445,
+  "I2": 446
+ },
+ "size": [
+  1280,
+  720
+ ],
+ "fov_deg": 61.421,
+ "why": "快速向前开，画面向四周放大，深度跨度大",
+ "flow_px": {
+  "median": 29.42,
+  "p95": 110.13,
+  "max": 192.5
+ },
+ "sky_pct": 0.0,
+ "psnr_db": {
+  "rife_pretrained": 28.798,
+  "concat_v3": 30.43
+ },
+ "ssim": {
+  "rife_pretrained": 0.9075,
+  "concat_v3": 0.9073
+ }
+}

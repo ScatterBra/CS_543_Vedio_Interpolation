@@ -1,0 +1,142 @@
+[
+ {
+  "shot": "StreetToSkyline",
+  "frames": {
+   "I0": 300,
+   "I1_gt": 301,
+   "I2": 302
+  },
+  "size": [
+   1280,
+   720
+  ],
+  "fov_deg": 61.421,
+  "why": "小运动、画面简单，两种方法都好",
+  "flow_px": {
+   "median": 10.02,
+   "p95": 16.87,
+   "max": 17.93
+  },
+  "sky_pct": 0.0,
+  "psnr_db": {
+   "rife_pretrained": 39.792,
+   "concat_v3": 38.327
+  },
+  "ssim": {
+   "rife_pretrained": 0.9898,
+   "concat_v3": 0.9853
+  }
+ },
+ {
+  "shot": "CloverSweep",
+  "frames": {
+   "I0": 444,
+   "I1_gt": 445,
+   "I2": 446
+  },
+  "size": [
+   1280,
+   720
+  ],
+  "fov_deg": 61.421,
+  "why": "遮挡关系变化：圆顶前景在楼群背景上移动",
+  "flow_px": {
+   "median": 6.29,
+   "p95": 58.42,
+   "max": 63.78
+  },
+  "sky_pct": 0.0,
+  "psnr_db": {
+   "rife_pretrained": 28.037,
+   "concat_v3": 28.3
+  },
+  "ssim": {
+   "rife_pretrained": 0.9416,
+   "concat_v3": 0.9512
+  }
+ },
+ {
+  "shot": "HighwaySweep",
+  "frames": {
+   "I0": 20,
+   "I1_gt": 21,
+   "I2": 22
+  },
+  "size": [
+   1280,
+   720
+  ],
+  "fov_deg": 61.421,
+  "why": "近处重复窗格纹理，RIFE 容易对错格",
+  "flow_px": {
+   "median": 18.83,
+   "p95": 49.37,
+   "max": 69.87
+  },
+  "sky_pct": 0.0,
+  "psnr_db": {
+   "rife_pretrained": 21.294,
+   "concat_v3": 31.979
+  },
+  "ssim": {
+   "rife_pretrained": 0.842,
+   "concat_v3": 0.9565
+  }
+ },
+ {
+  "shot": "StraightawaySweep",
+  "frames": {
+   "I0": 444,
+   "I1_gt": 445,
+   "I2": 446
+  },
+  "size": [
+   1280,
+   720
+  ],
+  "fov_deg": 61.421,
+  "why": "快速向前开，画面向四周放大，深度跨度大",
+  "flow_px": {
+   "median": 29.42,
+   "p95": 110.13,
+   "max": 192.5
+  },
+  "sky_pct": 0.0,
+  "psnr_db": {
+   "rife_pretrained": 28.798,
+   "concat_v3": 30.43
+  },
+  "ssim": {
+   "rife_pretrained": 0.9075,
+   "concat_v3": 0.9073
+  }
+ },
+ {
+  "shot": "CarCarsh",
+  "frames": {
+   "I0": 292,
+   "I1_gt": 293,
+   "I2": 294
+  },
+  "size": [
+   1280,
+   720
+  ],
+  "fov_deg": 61.421,
+  "why": "镜头高速滚转，运动约 200 px，前景是车",
+  "flow_px": {
+   "median": 194.82,
+   "p95": 257.73,
+   "max": 278.28
+  },
+  "sky_pct": 0.0,
+  "psnr_db": {
+   "rife_pretrained": 16.918,
+   "concat_v3": 17.954
+  },
+  "ssim": {
+   "rife_pretrained": 0.4358,
+   "concat_v3": 0.5005
+  }
+ }
+]

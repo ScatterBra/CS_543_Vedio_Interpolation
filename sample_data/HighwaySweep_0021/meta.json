@@ -1,0 +1,28 @@
+{
+ "shot": "HighwaySweep",
+ "frames": {
+  "I0": 20,
+  "I1_gt": 21,
+  "I2": 22
+ },
+ "size": [
+  1280,
+  720
+ ],
+ "fov_deg": 61.421,
+ "why": "近处重复窗格纹理，RIFE 容易对错格",
+ "flow_px": {
+  "median": 18.83,
+  "p95": 49.37,
+  "max": 69.87
+ },
+ "sky_pct": 0.0,
+ "psnr_db": {
+  "rife_pretrained": 21.294,
+  "concat_v3": 31.979
+ },
+ "ssim": {
+  "rife_pretrained": 0.842,
+  "concat_v3": 0.9565
+ }
+}

@@ -1,0 +1,28 @@
+{
+ "shot": "StreetToSkyline",
+ "frames": {
+  "I0": 300,
+  "I1_gt": 301,
+  "I2": 302
+ },
+ "size": [
+  1280,
+  720
+ ],
+ "fov_deg": 61.421,
+ "why": "小运动、画面简单，两种方法都好",
+ "flow_px": {
+  "median": 10.02,
+  "p95": 16.87,
+  "max": 17.93
+ },
+ "sky_pct": 0.0,
+ "psnr_db": {
+  "rife_pretrained": 39.792,
+  "concat_v3": 38.327
+ },
+ "ssim": {
+  "rife_pretrained": 0.9898,
+  "concat_v3": 0.9853
+ }
+}

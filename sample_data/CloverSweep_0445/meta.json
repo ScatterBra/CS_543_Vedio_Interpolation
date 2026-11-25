@@ -1,0 +1,28 @@
+{
+ "shot": "CloverSweep",
+ "frames": {
+  "I0": 444,
+  "I1_gt": 445,
+  "I2": 446
+ },
+ "size": [
+  1280,
+  720
+ ],
+ "fov_deg": 61.421,
+ "why": "遮挡关系变化：圆顶前景在楼群背景上移动",
+ "flow_px": {
+  "median": 6.29,
+  "p95": 58.42,
+  "max": 63.78
+ },
+ "sky_pct": 0.0,
+ "psnr_db": {
+  "rife_pretrained": 28.037,
+  "concat_v3": 28.3
+ },
+ "ssim": {
+  "rife_pretrained": 0.9416,
+  "concat_v3": 0.9512
+ }
+}
