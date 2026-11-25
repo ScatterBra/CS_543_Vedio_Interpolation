@@ -1,0 +1,28 @@
+{
+ "shot": "CarCarsh",
+ "frames": {
+  "I0": 292,
+  "I1_gt": 293,
+  "I2": 294
+ },
+ "size": [
+  1280,
+  720
+ ],
+ "fov_deg": 61.421,
+ "why": "镜头高速滚转，运动约 200 px，前景是车",
+ "flow_px": {
+  "median": 194.82,
+  "p95": 257.73,
+  "max": 278.28
+ },
+ "sky_pct": 0.0,
+ "psnr_db": {
+  "rife_pretrained": 16.918,
+  "concat_v3": 17.954
+ },
+ "ssim": {
+  "rife_pretrained": 0.4358,
+  "concat_v3": 0.5005
+ }
+}
