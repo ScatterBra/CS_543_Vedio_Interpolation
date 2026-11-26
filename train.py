@@ -45,12 +45,23 @@ def train(model, local_rank):
         writer_val = None
     step = 0
     nr_eval = 0
-    dataset = VimeoDataset('train', args.data)
+    if args.game_data:
+        dataset = GameDataset('train', args.data, batch_size=args.batch_size)
+        dataset_val = GameDataset('validation', args.data, batch_size=1)
+        # Can be adjusted based on training speed and CPU memory usage.
+        train_num_workers = 0
+        val_num_workers = 0
+    else:
+        dataset = VimeoDataset('train', args.data, batch_size=args.batch_size)
+        dataset_val = VimeoDataset('validation', args.data, batch_size=16)
+        train_num_workers = 8
+        val_num_workers = 8
     sampler = DistributedSampler(dataset)
-    train_data = DataLoader(dataset, batch_size=args.batch_size, num_workers=8, pin_memory=True, drop_last=True, sampler=sampler)
+    train_data = DataLoader(dataset, batch_size=dataset.batch_size, num_workers=train_num_workers, pin_memory=True, drop_last=True, sampler=sampler)
     args.step_per_epoch = train_data.__len__()
-    dataset_val = VimeoDataset('validation', args.data)
-    val_data = DataLoader(dataset_val, batch_size=16, pin_memory=True, num_workers=8)
+    if args.game_data and args.step_per_epoch == 0:
+        raise ValueError('No game training batches. Reduce --batch_size or add training samples.')
+    val_data = DataLoader(dataset_val, batch_size=dataset_val.batch_size, pin_memory=True, num_workers=val_num_workers)
     print('training...')
     time_stamp = time.time()
     for epoch in range(args.epoch):
@@ -58,6 +69,8 @@ def train(model, local_rank):
         for i, data in enumerate(train_data):
             data_time_interval = time.time() - time_stamp
             time_stamp = time.time()
+            if args.game_data:
+                data = data['data'], data['timestep']
             data_gpu, timestep = data
             data_gpu = data_gpu.to(device, non_blocking=True) / 255.
             timestep = timestep.to(device, non_blocking=True)
@@ -79,11 +92,11 @@ def train(model, local_rank):
                 merged_img = (info['merged_tea'].permute(0, 2, 3, 1).detach().cpu().numpy() * 255).astype('uint8')
                 flow0 = info['flow'].permute(0, 2, 3, 1).detach().cpu().numpy()
                 flow1 = info['flow_tea'].permute(0, 2, 3, 1).detach().cpu().numpy()
-                for i in range(min(5, len(gt))):
-                    imgs = np.concatenate((merged_img[i], pred[i], gt[i]), 1)[:, :, ::-1]
-                    writer.add_image(str(i) + '/img', imgs, step, dataformats='HWC')
-                    writer.add_image(str(i) + '/flow', np.concatenate((flow2rgb(flow0[i]), flow2rgb(flow1[i])), 1), step, dataformats='HWC')
-                    writer.add_image(str(i) + '/mask', mask[i], step, dataformats='HWC')
+                for j in range(min(5, len(gt))):
+                    imgs = np.concatenate((merged_img[j], pred[j], gt[j]), 1)[:, :, ::-1]
+                    writer.add_image(str(j) + '/img', imgs, step, dataformats='HWC')
+                    writer.add_image(str(j) + '/flow', np.concatenate((flow2rgb(flow0[j]), flow2rgb(flow1[j])), 1), step, dataformats='HWC')
+                    writer.add_image(str(j) + '/mask', mask[j], step, dataformats='HWC')
                 writer.flush()
             if local_rank == 0:
                 print('epoch:{} {}/{} time:{:.2f}+{:.2f} loss_l1:{:.4e}'.format(epoch, i, args.step_per_epoch, data_time_interval, train_time_interval, info['loss_l1']))
@@ -102,13 +115,27 @@ def evaluate(model, val_data, nr_eval, local_rank, writer_val):
     psnr_list_teacher = []
     time_stamp = time.time()
     for i, data in enumerate(val_data):
+        if args.game_data:
+            data = data['data'], data['timestep']
         data_gpu, timestep = data
         data_gpu = data_gpu.to(device, non_blocking=True) / 255.        
         imgs = data_gpu[:, :6]
         gt = data_gpu[:, 6:9]
+        if args.game_data:
+            h, w = gt.shape[-2:]
+            # Match RIFE inference padding and measure PSNR on the original image.
+            padding = (0, (-w) % 32, 0, (-h) % 32)
+            imgs = torch.nn.functional.pad(imgs, padding)
+            gt = torch.nn.functional.pad(gt, padding)
         with torch.no_grad():
             pred, info = model.update(imgs, gt, training=False)
             merged_img = info['merged_tea']
+        flow0 = info['flow']
+        if args.game_data:
+            gt = gt[..., :h, :w]
+            pred = pred[..., :h, :w]
+            merged_img = merged_img[..., :h, :w]
+            flow0 = flow0[..., :h, :w]
         loss_l1_list.append(info['loss_l1'].cpu().numpy())
         loss_tea_list.append(info['loss_tea'].cpu().numpy())
         loss_distill_list.append(info['loss_distill'].cpu().numpy())
@@ -120,7 +147,7 @@ def evaluate(model, val_data, nr_eval, local_rank, writer_val):
         gt = (gt.permute(0, 2, 3, 1).cpu().numpy() * 255).astype('uint8')
         pred = (pred.permute(0, 2, 3, 1).cpu().numpy() * 255).astype('uint8')
         merged_img = (merged_img.permute(0, 2, 3, 1).cpu().numpy() * 255).astype('uint8')
-        flow0 = info['flow'].permute(0, 2, 3, 1).cpu().numpy()
+        flow0 = flow0.permute(0, 2, 3, 1).cpu().numpy()
         flow1 = info['flow_tea'].permute(0, 2, 3, 1).cpu().numpy()
         if i == 0 and local_rank == 0:
             for j in range(min(10, len(gt))):
@@ -137,7 +164,9 @@ def evaluate(model, val_data, nr_eval, local_rank, writer_val):
         
 if __name__ == "__main__":    
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data', required=True, help='Path to the training dataset directory (currently Vimeo triplet format)')
+    parser.add_argument('--data', required=True, help='Path to the dataset root containing the split lists')
+    parser.add_argument('--game_data', action='store_true',
+                        help='Load game frames, motion vectors, and inverse depth.')
     parser.add_argument('--pretrained', default=None, help='Path to the pretrained model weights file')
     parser.add_argument('--output', default=os.path.join('outputs', 'train', 'model.pkl'), help='Path to the output model weights file')
     parser.add_argument('--epoch', default=300, type=int)
@@ -146,15 +175,18 @@ if __name__ == "__main__":
     parser.add_argument('--world_size', default=4, type=int, help='world size')
     args = parser.parse_args()
     torch.distributed.init_process_group(backend="nccl", world_size=args.world_size)
-    torch.cuda.set_device(args.local_rank)
-    seed = 1234
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.benchmark = True
-    model = Model(args.local_rank)
-    if args.pretrained:
-        model.load_model(args.pretrained)
-    train(model, args.local_rank)
+    try:
+        torch.cuda.set_device(args.local_rank)
+        seed = 1234
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.benchmark = True
+        model = Model(args.local_rank)
+        if args.pretrained:
+            model.load_model(args.pretrained)
+        train(model, args.local_rank)
+    finally:
+        dist.destroy_process_group()
         
